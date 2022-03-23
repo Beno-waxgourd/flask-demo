@@ -1,8 +1,8 @@
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, url_for
 )
+import psycopg2.extras
 from werkzeug.exceptions import abort
-
 from flaskr.auth import login_required
 from flaskr.db import get_db
 
@@ -11,11 +11,11 @@ bp = Blueprint('blog', __name__)
 @bp.route('/')
 def index():
     db = get_db()
-    cursor = db.cursor()
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute(
-        "SELECT p.id, title, body, created, author_id, username "
-        "FROM post p JOIN user u ON p.author_id = u.id "
-        "ORDER BY created DESC"
+        """SELECT p.id, title, body, created, author_id, username 
+        FROM post AS p JOIN users AS u ON p.author_id = u.id 
+        ORDER BY created DESC"""
     )
     posts = cursor.fetchall()
     return render_template('blog/index.html', posts=posts)
@@ -36,7 +36,9 @@ def create():
         else:
             db = get_db()
             cursor = db.cursor()
-            cursor.execute("INSERT INTO post (title, body, author_id) VALUES ('" + title  + "', '" + body + "', " + g.user['id'] + ")")
+            insert_query = """ INSERT INTO post (title, body, author_id) VALUES (%s, %s, %s) """
+            item_tuple = (title, body, g.users['id'])
+            cursor.execute(insert_query, item_tuple)
 
             db.commit()
             return redirect(url_for('blog.index'))
@@ -45,8 +47,8 @@ def create():
 
 def get_post(id, check_author=True):
     db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT p.id, title, body, created, author_id, username FROM post p JOIN user u ON p.author_id = u.id WHERE p.id = %d" %(id) )
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute("""SELECT p.id, title, body, created, author_id, username FROM post p JOIN users u ON p.author_id = u.id WHERE p.id = %d""" %(id) )
     post = cursor.fetchone()
 
     if post is None:
@@ -76,10 +78,9 @@ def update(id):
         else:
             db = get_db()
             cursor = db.cursor()
-            cursor.execute(
-                "UPDATE post SET title = '" + title + "', body = '" + body + "' "
-                "WHERE id = %d" %(id),
-            )
+            update_query = """ UPDATE post SET title = %s, body = %s WHERE id = %s """
+            item_tuple = (title, body, id)
+            cursor.execute(update_query, item_tuple)
             db.commit()
             return redirect(url_for('blog.index'))
 

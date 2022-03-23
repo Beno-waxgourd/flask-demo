@@ -1,5 +1,6 @@
 import functools
-
+import psycopg2
+import psycopg2.extras
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
@@ -28,7 +29,10 @@ def register():
 
         if error is None:
             try:
-                cursor.execute("INSERT INTO users (username, password) VALUES ('" + username + "', '" + generate_password_hash(password) + "')")
+                insert_query = """ INSERT INTO users (username, password) VALUES (%s, %s) """
+                # item_tuple = (username, generate_password_hash(password))
+                item_tuple = (username, generate_password_hash(password))
+                cursor.execute(insert_query, item_tuple)
                 # 使用 generate_password_hash() 生成安全的哈希值，再把哈希值储存到数据库中
                 db.commit()
             except db.IntegrityError:
@@ -49,11 +53,18 @@ def login():
         username = request.form['username']
         password = request.form['password']
         db = get_db()
-        cursor = db.cursor()
+        cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
         error = None
-        cursor.execute("SELECT * from users WHERE username='" + username + "'AND password='" + password + "'")
+        # select_query = """ SELECT * from users WHERE username= %s AND password= %s """
+        # item_tuple = (username, password)
+        # cursor.execute(select_query,item_tuple)
+        cursor.execute(""" SELECT * from users WHERE username= %s """, (username,))
         users = cursor.fetchone()
-        # print(username,password,'users:',users)
+
+        # print(users,db,cursor)
+        # print(cursor.execute(select_query, item_tuple))
+        # print(cursor.fetchone())
+
         # posts = cursor.fetchall()
         # print("posts:",posts)
         # cursor.execute(
@@ -62,8 +73,8 @@ def login():
         # fetchone() 根据查询返回一个记录行。如果查询没有结果，则返回 None。
 
         if users is None:
-            error = 'Incorrect username.'
-        elif not check_password_hash(users[1], password):
+            error = 'Incorrect username or password.'
+        elif not check_password_hash(users['password'], password):
             # check_password_hash() 以相同的方式哈希提交的 密码并安全的比较哈希值。如果匹配成功，那么密码就是正确的。
             error = 'Incorrect password.'
 
@@ -71,13 +82,27 @@ def login():
             session.clear()
             # session是一个 dict, 它用于储存横跨请求的值。当验证成功后，用户的 id 被储存于一个新的会话中。
             # 会话数据被储存到一个 向浏览器发送的 cookie 中，在后继请求中，浏览器会返回它。
-            session["user_id"] = users[0]
+            session["user_id"] = users['id']
+            session["username"] = users['username']
             # session['user_id'] = users['id']
             return redirect(url_for('index'))
 
         flash(error)
 
     return render_template('auth/login.html')
+
+@bp.before_app_request
+def load_logged_in_user():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        g.users = None
+    else:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute("""SELECT * FROM users WHERE id = %s""", (user_id,))
+        res = cursor.fetchone()
+        g.users = {"id": res[0], "username": res[1]}
 
 @bp.route('/logout')
 def logout():
@@ -89,7 +114,6 @@ def login_required(view):
     def wrapped_view(**kwargs):
         if g.users is None:
             return redirect(url_for('auth.login'))
-
         return view(**kwargs)
 
     return wrapped_view
