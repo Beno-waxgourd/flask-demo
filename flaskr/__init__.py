@@ -2,6 +2,8 @@ import os
 # import db
 
 from flask import Flask
+from flaskr import auth
+from flaskr import blog
 
 
 def create_app(test_config=None):
@@ -33,11 +35,11 @@ def create_app(test_config=None):
     from . import db
     db.init_app(app)
 
-    from . import auth
+    # from . import auth
     app.register_blueprint(auth.bp)
     # 使用 app.register_blueprint() 导入并注册蓝图
 
-    from . import blog
+    # from . import blog
     app.register_blueprint(blog.bp)
     app.add_url_rule('/', endpoint='index')
     # 我们使用 app.add_url_rule() 关联端点名称 'index' 和 / URL ，这样 url_for('index') 或 url_for('blog.index') 都会有效，会生成同样的 / URL 。

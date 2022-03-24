@@ -8,17 +8,21 @@ from flask import current_app, g
 # 把连接储存于其中，可以多次使用，而不用在同一个 请求中每次调用 get_db 时都创建一个新的连接。
 from flask.cli import with_appcontext
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
 
-# def connectPostgreSQL():
-#     conn = psycopg2.connect(database="flask_demo", user='postgres', password='password', host='127.0.0.1', port='5432')
-#     print('connect successful')
+# def get_db():
+#     if 'db' not in g:
+#         conn = psycopg2.connect(database="flask_demo", user='postgres', password='password', host='127.0.0.1', port='5432')
+#         # print('connect successful')
+#         g.db = conn
+#     return g.db
 
 def get_db():
     if 'db' not in g:
-        conn = psycopg2.connect(database="flask_demo", user='postgres', password='password', host='127.0.0.1', port='5432')
-        # print('connect success')
-        g.db = conn
-
+        engine = create_engine('postgresql+psycopg2://postgres:password@127.0.0.1:5432/flask_demo')
+        # print('connect successful')
+        g.db = scoped_session(sessionmaker(bind=engine))
     return g.db
 
 def close_db(e=None):
@@ -30,7 +34,7 @@ def close_db(e=None):
 def init_db():
 
     db = get_db()
-    cursor = db.cursor()
+    # cursor = db.cursor()
 
     with current_app.open_resource('schema.sql') as f:
         # open_resource() 打开一个文件，该文件名是相对于flaskr包的。
@@ -40,7 +44,8 @@ def init_db():
         db.to_sql(f.read().decode('utf8'))
         db.executescript(f.read().decode('utf8'))
         """
-        cursor.execute(f.read().decode('utf8'))
+        # cursor.execute(f.read().decode('utf8'))
+        db.execute(f.read().decode('utf8'))
     db.commit()
     print('exec success')
 
