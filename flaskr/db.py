@@ -22,7 +22,12 @@ def get_db():
     if 'db' not in g:
         engine = create_engine('postgresql+psycopg2://postgres:password@127.0.0.1:5432/flask_demo')
         # print('connect successful')
+
+        # Session = sessionmaker(bind=engine)
+        # g.db = Session()
+
         g.db = scoped_session(sessionmaker(bind=engine))
+
     return g.db
 
 def close_db(e=None):

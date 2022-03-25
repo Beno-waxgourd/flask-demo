@@ -5,7 +5,7 @@ import psycopg2.extras
 from werkzeug.exceptions import abort
 from flaskr.auth import login_required
 from flaskr.db import get_db
-from flaskr.tables import Post
+from flaskr.tables import Users,Post
 
 bp = Blueprint('blog', __name__)
 
@@ -20,11 +20,15 @@ def index():
     # )
     # posts = cursor.fetchall()
     db = get_db()
-    posts = db.execute(
-        """SELECT p.id, title, body, created, author_id, username 
-        FROM post AS p JOIN users AS u ON p.author_id = u.id 
-        ORDER BY created DESC"""
-    ).fetchall()
+    # posts = db.execute(
+    #     """SELECT p.id, title, body, created, author_id, username
+    #     FROM post AS p JOIN users AS u ON p.author_id = u.id
+    #     ORDER BY created DESC"""
+    # ).fetchall()
+    posts = db.query(Post, Users).filter(Post.author_id == Users.id).order_by(Post.created).all()
+    for p,u in posts:
+        print(p.id, p.title, p.body, p.created, p.author_id, u.username)
+
     return render_template('blog/index.html', posts=posts)
 
 @bp.route('/create', methods=('GET', 'POST'))
@@ -58,8 +62,8 @@ def get_post(id, check_author=True):
     # cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     # cursor.execute("""SELECT p.id, title, body, created, author_id, username FROM post p JOIN users u ON p.author_id = u.id WHERE p.id = %d""" %(id) )
     # post = cursor.fetchone()
-    post = db.execute("""SELECT p.id, title, body, created, author_id, username FROM post p JOIN users u ON p.author_id = u.id WHERE p.id = %d""" %(id) ).fetchone()
-
+    # post = db.execute("""SELECT p.id, title, body, created, author_id, username FROM post p JOIN users u ON p.author_id = u.id WHERE p.id = %d""" %(id) ).fetchone()
+    post = db.query(Post, Users.username).filter(Post.id == id).outerjoin(Users, Users.id == Post.author_id).fetchone()
     if post is None:
         abort(404, f"Post id {id} doesn't exist.")
 
@@ -90,7 +94,8 @@ def update(id):
             # update_query = """ UPDATE post SET title = %s, body = %s WHERE id = %s """
             # item_tuple = (title, body, id)
             # cursor.execute(update_query, item_tuple)
-            db.execute(""" UPDATE post SET title = %s, body = %s WHERE id = %s """, (title, body, id))
+            # db.execute(""" UPDATE post SET title = %s, body = %s WHERE id = %s """, (title, body, id))
+            db.query(Post).filter(Post.id == id).update({Post.title:title, Post.body:body})
             db.commit()
             return redirect(url_for('blog.index'))
 
@@ -103,6 +108,7 @@ def delete(id):
     db = get_db()
     # cursor = db.cursor()
     # cursor.execute("DELETE FROM post WHERE id = %d" %(id))
-    db.execute("DELETE FROM post WHERE id = %d" %(id))
+    # db.execute("DELETE FROM post WHERE id = %d" %(id))
+    db.query(Post).filter(Post.id == id).delete()
     db.commit()
     return redirect(url_for('blog.index'))

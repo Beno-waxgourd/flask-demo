@@ -4,6 +4,7 @@ import psycopg2.extras
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from flaskr.db import get_db
@@ -37,7 +38,7 @@ def register():
                 db.add(new_user)
                 # 使用 generate_password_hash() 生成安全的哈希值，再把哈希值储存到数据库中
                 db.commit()
-            except db.IntegrityError:
+            except IntegrityError:
                 error = f"User {username} is already registered."
                 # 如果用户名已存在，会产生一个IntegrityError错误，应当将该错误作为一个验证错误显示给用户。
             else:
@@ -74,28 +75,35 @@ def login():
         #     # check_password_hash() 以相同的方式哈希提交的 密码并安全的比较哈希值。如果匹配成功，那么密码就是正确的。
         #     error = 'Incorrect password.'
 
-        userss = db.execute(""" SELECT * from users """).fetchall()
-        # print(users)
-        for users in userss:
-            # print(use,use.id,use.username)
-            if users.username == username:
-                if check_password_hash(users.password, password):
-                    error = None
-                    # print(users,error)
-                    break
-                else:
-                    error = 'Incorrect password.'
-                    break
+        users = db.query(Users).filter(Users.username == username).first()
+        if users is None:
             error = 'Incorrect username.'
-        # print(users,error)
+        elif not check_password_hash(users.password, password):
+            error = 'Incorrect password.'
+
+        # userss = db.execute(" SELECT * from users ").fetchall()
+        # # print(users)
+        # for users in userss:
+        #     # print(use,use.id,use.username)
+        #     if users.username == username:
+        #         if check_password_hash(users.password, password):
+        #             error = None
+        #             # print(users,error)
+        #             break
+        #         else:
+        #             error = 'Incorrect password.'
+        #             break
+        #     error = 'Incorrect username.'
+
+
         if error is None:
             session.clear()
             # session是一个 dict, 它用于储存横跨请求的值。当验证成功后，用户的 id 被储存于一个新的会话中。
             # 会话数据被储存到一个 向浏览器发送的 cookie 中，在后继请求中，浏览器会返回它。
             # session["user_id"] = users['id']
             # session["username"] = users['username']
-            session["user_id"] = users['id']
-            session["username"] = users['username']
+            session["user_id"] = users.id
+            session["username"] = users.username
             return redirect(url_for('index'))
 
         flash(error)
@@ -113,8 +121,9 @@ def load_logged_in_user():
         # cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # cursor.execute("""SELECT * FROM users WHERE id = %s""", (user_id,))
         # res = cursor.fetchone()
-        res = db.execute("""SELECT * FROM users WHERE id = %d""" %(user_id,)).fetchone()
-        g.users = {"id": res[0], "username": res[1]}
+        # res = db.execute("""SELECT * FROM users WHERE id = %d""" %(user_id,)).fetchone()
+        res = db.query(Users).filter(Users.id == user_id).first()
+        g.users = {"id": res.id, "username": res.username}
 
 @bp.route('/logout')
 def logout():
