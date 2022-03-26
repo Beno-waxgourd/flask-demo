@@ -19,6 +19,11 @@ def index():
     #     ORDER BY created DESC"""
     # )
     # posts = cursor.fetchall()
+
+    #
+    # 1
+    #
+
     db = get_db()
     posts = db.execute(
         """SELECT p.id, title, body, created, author_id, username
@@ -27,12 +32,13 @@ def index():
     ).fetchall()
     # print(posts)
 
+    #
+    # 2
+    #
+
     # p, u = db.query(Post, Users.username).filter(Post.author_id == Users.id).order_by(Post.created).all()[0]
     # posts = [(p.id, p.title, p.body, p.created, p.author_id, u)]
     # print(posts)
-    # posts = db.query(Post, Users).filter(Post.author_id == Users.id).order_by(Post.created).all()
-    # for p,u in posts:
-    #     print(p.id, p.title, p.body, p.author_id, u.username)
 
     return render_template('blog/index.html', posts=posts)
 
